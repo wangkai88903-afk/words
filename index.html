@@ -1574,7 +1574,10 @@ function sbSave(){
   if (!sb || !sbUser) return;
   clearTimeout(_sbSaveT);
   _sbSaveT = setTimeout(async () => {
-    const { error } = await sb.from('user_data').upsert({ user_id: sbUser.id, data: UD, updated_at: new Date().toISOString() });
+    const { error } = await sb.from('user_data').upsert(
+      { user_id: sbUser.id, data: UD, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    );
     if (error) showToast('云端同步失败：' + (error.message || '未知错误'));
   }, 600);
 }
