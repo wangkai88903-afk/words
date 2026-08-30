@@ -323,9 +323,6 @@ body{
   font-size:14px;cursor:pointer;font-family:inherit;}
 .auth-btn:hover{opacity:.92;}
 .auth-err{color:#E0584B;font-size:11.5px;margin-top:8px;min-height:14px;line-height:1.4;}
-.auth-skip{text-align:center;margin-top:10px;}
-.auth-skip button{border:none;background:transparent;color:#185FA5;font-size:12px;
-  cursor:pointer;text-decoration:underline;font-family:inherit;}
 .ub-email{font-size:11px;color:#555;margin-right:8px;}
 .ub-logout{border:1px solid #AAA;background:#fff;color:#777;border-radius:5px;font-size:11px;
   cursor:pointer;font-family:inherit;padding:3px 10px;}
@@ -447,7 +444,6 @@ body{
     <input id="auth-pass" type="password" placeholder="密码（至少6位）" autocomplete="current-password">
     <button id="auth-submit" class="auth-btn">登录</button>
     <div id="auth-err" class="auth-err"></div>
-    <div id="auth-skip" class="auth-skip"></div>
   </div>
 </div>
 <script>document.getElementById('authGate').style.display='flex';</script>
@@ -1440,11 +1436,6 @@ function setupGate(){
   if (tr) tr.onclick = () => { mode = 'register'; tr.classList.add('active'); tg.classList.remove('active'); document.getElementById('auth-submit').textContent = '注册'; authErr(''); };
   const sb = document.getElementById('auth-submit');
   if (sb) sb.onclick = () => { mode === 'login' ? doLogin() : doRegister(); };
-  const skip = document.getElementById('auth-skip');
-  if (skip){
-    skip.innerHTML = '<button id="authLocal">以本地模式进入（仅本机，不同步云端）</button>';
-    document.getElementById('authLocal').onclick = () => { showGate(false); showToast('本地模式：数据仅存本机'); };
-  }
 }
 async function sbLoad(){
   if (!sb || !sbUser) return;
@@ -1489,17 +1480,17 @@ async function doLogout(){
 function initAuth(){
   showGate(true); // 默认先盖住内容，避免 Supabase 国内网络慢导致门禁迟迟不出现
   if (typeof window.supabase === 'undefined'){
-    showToast('云端库加载失败，可点下方“本地模式进入”');
-    return; // 仍显示门禁，提供本地模式入口兜底
+    authErr('云端服务连接中，若长时间未出现登录框请刷新页面重试');
+    return; // 仍显示门禁；不提供本地模式绕过
   }
-  if (!SB_ENABLED){ showGate(false); return; } // 本地模式，不强制门禁
-  if (location.protocol === 'file:'){ showGate(false); showToast('本地文件模式：未启用云端登录'); return; }
+  if (!SB_ENABLED){ showGate(false); return; } // 本地模式（未配置 Supabase），不强制门禁
+  if (location.protocol === 'file:'){ showGate(false); authErr('本地文件模式：未启用云端登录'); return; }
   try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); }
-  catch (e){ showToast('云端初始化失败，可点下方“本地模式进入”'); return; }
+  catch (e){ authErr('云端初始化失败，请刷新页面重试'); return; }
   sb.auth.getUser().then(({ data }) => {
     if (data && data.user){ sbUser = data.user; sbLoad().then(() => { showGate(false); renderUserBox(); applyUserState(); }); }
-    // 未登录：保持门禁显示，强制登录 / 注册
-  }).catch(() => { /* Supabase 不可达：保持门禁，用户可本地模式进入 */ });
+    // 未登录：保持门禁显示，强制登录 / 注册（未注册用户无法进入）
+  }).catch(() => { authErr('云端暂时不可达，请刷新页面重试'); /* 保持门禁，不提供本地模式 */ });
 }
 
 /* ================= 初始化 ================= */

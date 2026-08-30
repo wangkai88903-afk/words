@@ -3,7 +3,7 @@
 // 导航请求采用网络优先，确保内容更新（如新增左侧目录）立即可见；
 // 其它静态资源缓存优先，以支持离线打开。
 // 更新内容时修改 CACHE 版本号即可触发更新。
-const CACHE = 'roots-pwa-v7';
+const CACHE = 'roots-pwa-v8';
 const ASSETS = [
   './',
   'index.html',
