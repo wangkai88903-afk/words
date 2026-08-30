@@ -712,11 +712,17 @@ function layoutPage(page){
     const myW = c.offsetWidth;
     const myH = c.offsetHeight;
     const childLeft = left + myW + H_GAP;
-    let childTop = top;
-    let childrenBottom = top;
-    (children[word] || []).forEach(cw => {
+    const childList = (children[word] || []).filter(cw => {
       const child = cardByWord[cw];
-      if (child.style.display === 'none') return;
+      return child && child.style.display !== 'none';
+    });
+    // 子卡片组整体高度，用于与父卡片垂直居中
+    let totalChildrenHeight = 0;
+    childList.forEach((cw, i) => { totalChildrenHeight += treeHeight(cw); if (i < childList.length - 1) totalChildrenHeight += ROW_GAP; });
+    let childTop = top + Math.max(0, (myH - totalChildrenHeight) / 2);
+    let childrenBottom = top;
+    childList.forEach((cw, idx) => {
+      const child = cardByWord[cw];
       const yParent = top + myH / 2;
       const yChild = childTop + child.offsetHeight / 2;
       lines.push({type:'branch', x1:left + myW, y1:yParent, x2:childLeft, y2:yChild});
