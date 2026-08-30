@@ -719,7 +719,8 @@ function layoutPage(page){
     // 子卡片组整体高度，用于与父卡片垂直居中
     let totalChildrenHeight = 0;
     childList.forEach((cw, i) => { totalChildrenHeight += treeHeight(cw); if (i < childList.length - 1) totalChildrenHeight += ROW_GAP; });
-    let childTop = top + Math.max(0, (myH - totalChildrenHeight) / 2);
+    // 子卡片组整体与父卡片垂直居中（允许子卡片组高度超过父卡片时向两侧对称超出）
+    let childTop = top + (myH - totalChildrenHeight) / 2;
     let childrenBottom = top;
     childList.forEach((cw, idx) => {
       const child = cardByWord[cw];
