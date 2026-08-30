@@ -3,7 +3,7 @@
 // 导航请求采用网络优先，确保内容更新（如新增左侧目录）立即可见；
 // 其它静态资源缓存优先，以支持离线打开。
 // 更新内容时修改 CACHE 版本号即可触发更新。
-const CACHE = 'roots-pwa-v4';
+const CACHE = 'roots-pwa-v5';
 const ASSETS = [
   './',
   'index.html',
@@ -11,7 +11,8 @@ const ASSETS = [
   'icon-192.png',
   'icon-512.png',
   'icon-maskable-512.png',
-  'apple-touch-icon.png'
+  'apple-touch-icon.png',
+  'supabase.min.js'
 ];
 
 self.addEventListener('install', event => {
