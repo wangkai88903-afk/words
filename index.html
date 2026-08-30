@@ -1458,21 +1458,28 @@ function sbSave(){
 async function doLogin(){
   const e = val('auth-email'), p = val('auth-pass');
   if (!e || !p){ authErr('请输入邮箱和密码'); return; }
-  const { error } = await sb.auth.signInWithPassword({ email: e, password: p });
+  if (!sb){ authErr('云端服务未就绪，请刷新页面重试'); return; }
+  const { data, error } = await sb.auth.signInWithPassword({ email: e, password: p });
   if (error){ authErr(error.message); return; }
-  await afterAuth();
+  await afterAuth(data.user || (data.session && data.session.user));
 }
 async function doRegister(){
   const e = val('auth-email'), p = val('auth-pass');
   if (!e || !p){ authErr('请输入邮箱和密码'); return; }
   if (p.length < 6){ authErr('密码至少 6 位'); return; }
+  if (!sb){ authErr('云端服务未就绪，请刷新页面重试'); return; }
   const { data, error } = await sb.auth.signUp({ email: e, password: p });
   if (error){ authErr(error.message); return; }
-  if (data.session){ await afterAuth(); }
-  else { authErr('注册成功！请到邮箱查收验证邮件后登录（或在 Supabase 后台 Authentication 设置中关闭“Confirm email”以直接登录）'); }
+  if (data.session){ await afterAuth(data.user || data.session.user); }
+  else { authErr('注册成功！请到邮箱查收验证邮件后登录（或在 Supabase 后台 Authentication → Providers → Email 关闭“Confirm email”以直接登录）'); }
 }
-async function afterAuth(){
-  const { data } = await sb.auth.getUser(); sbUser = data.user;
+async function afterAuth(passedUser){
+  let user = passedUser || null;
+  if (!user && sb){
+    try { const { data } = await sb.auth.getUser(); user = data.user || null; } catch (e){ user = null; }
+  }
+  if (!user){ authErr('登录状态获取失败，请重试'); showGate(true); return; }
+  sbUser = user;
   await sbLoad();
   showGate(false); renderUserBox(); showToast('已登录：' + (sbUser.email || ''));
   applyUserState();
