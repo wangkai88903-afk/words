@@ -805,22 +805,22 @@ function toggleCard(card, e){
       e.target.closest('.speak') || e.target.closest('.move-btn') || e.target.closest('.color-btn'))) return;
   card.classList.toggle('collapsed');
   setChildrenDisplay(card, card.classList.contains('collapsed'));
-  requestAnimationFrame(layout);
+  requestAnimationFrame(() => requestAnimationFrame(layout));
 }
 function toggleCenter(node){
   node.classList.toggle('collapsed');
-  requestAnimationFrame(layout);
+  requestAnimationFrame(() => requestAnimationFrame(layout));
 }
 function expandAll(){
   document.querySelectorAll('.page.active .card, .page.active .center-node')
     .forEach(c => { c.classList.remove('collapsed'); c.style.display = ''; });
-  requestAnimationFrame(layout);
+  requestAnimationFrame(() => requestAnimationFrame(layout));
 }
 function collapseAll(){
   document.querySelectorAll('.page.active .card, .page.active .center-node')
     .forEach(c => c.classList.add('collapsed'));
   document.querySelectorAll('.page.active .card.child').forEach(c => c.style.display = 'none');
-  requestAnimationFrame(layout);
+  requestAnimationFrame(() => requestAnimationFrame(layout));
 }
 
 /* ================= 收藏 ================= */
