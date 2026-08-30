@@ -1179,7 +1179,12 @@ window.addEventListener('load', () => {
   gotoRoot(start, true);
 
   if ('serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(() => {
+      let _swReloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!_swReloading){ _swReloading = true; location.reload(); }
+      });
+    }).catch(() => {});
   }
 });
 window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(layout, 120); });
