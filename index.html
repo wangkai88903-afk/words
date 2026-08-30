@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#042C53">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script src="supabase.min.js"></script>
+<script defer src="supabase.min.js"></script>
 <style>
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;height:100%;}
@@ -450,6 +450,7 @@ body{
     <div id="auth-skip" class="auth-skip"></div>
   </div>
 </div>
+<script>document.getElementById('authGate').style.display='flex';</script>
 
 <script>
 const SUPABASE_URL = 'https://khthjbutmzopfesvoqjk.supabase.co';
