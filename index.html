@@ -39,7 +39,7 @@ body{
 .rk-name{font-weight:600;color:#0C447C;flex:0 0 auto;}
 .rk-mean{font-size:11px;color:#999;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rk-cnt{margin-left:auto;font-size:10px;color:#B0AEA4;flex:0 0 auto;}
-.main{flex:1;overflow:auto;position:relative;padding-top:70px;}
+.main{flex:1;overflow:auto;position:relative;}
 .topbar{
   position:sticky;top:0;background:#FAFAF8;padding:12px 24px;z-index:10;
   border-bottom:1px solid #E9E7E0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
@@ -57,7 +57,7 @@ body{
 #menuBtn{display:none;}
 
 /* ========== 页面 ========== */
-.page{display:none;padding:8px 24px 60px;}
+.page{display:none;padding:70px 24px 60px;}
 .page.active{display:block;}
 .page-head{
   max-width:680px;margin:0 auto 6px;background:#fff;border:1px solid #E3E1DA;
@@ -370,8 +370,7 @@ body{
       <button onclick="expandAll()">全部展开</button>
       <button onclick="collapseAll()">全部折叠</button>
       <button id="sortBtn" onclick="toggleSort()">🔃 调整顺序</button>
-      <button id="nestBtn" onclick="toggleNest()">🌿 嵌套</button>
-      <button onclick="downloadHTML()">⬇ 下载本页</button>
+      <button id="nestBtn" onclick="toggleNest()">🌿 拖动</button>
       <span id="userBox"></span>
       <span id="env-tip" class="env-tip" style="display:none;"></span>
       <div class="legend">
@@ -1096,11 +1095,11 @@ function speakWord(word){
     const v = pickVoice(); if (v) u.voice = v;
     let spoken = false;
     u.onstart = () => { spoken = true; };
-    u.onerror = () => showToast('预览环境发音受限：点上方「下载本页」用本地浏览器打开即可正常发音');
+    u.onerror = () => showToast('预览环境发音受限，请用本地浏览器打开本文件即可正常发音');
     setTimeout(() => window.speechSynthesis.speak(u), 60);
     setTimeout(() => {
       if (!spoken && window.speechSynthesis.speaking === false && window.self !== window.top)
-        showToast('预览环境发音受限：点上方「下载本页」用本地浏览器打开即可正常发音');
+        showToast('预览环境发音受限，请用本地浏览器打开本文件即可正常发音');
     }, 460);
   } catch (e){ showToast('发音失败，请用本地浏览器打开本文件'); }
 }
@@ -1367,7 +1366,7 @@ function toggleNest(){
   const on = diagram.classList.toggle('nesting');
   page.querySelectorAll('.card').forEach(c => c.draggable = on);
   const btn = document.getElementById('nestBtn');
-  if (btn){ btn.classList.toggle('active', on); btn.textContent = on ? '✅ 完成嵌套' : '🌿 嵌套'; }
+  if (btn){ btn.classList.toggle('active', on); btn.textContent = on ? '✅ 完成拖动' : '🌿 拖动'; }
   layout();
 }
 function applyNesting(idx){
@@ -1486,7 +1485,7 @@ function toggleSort(){
   if (diagram.classList.contains('nesting')){
     diagram.classList.remove('nesting');
     page.querySelectorAll('.card').forEach(c => c.draggable = false);
-    const nb = document.getElementById('nestBtn'); if (nb){ nb.classList.remove('active'); nb.textContent = '🌿 嵌套'; }
+    const nb = document.getElementById('nestBtn'); if (nb){ nb.classList.remove('active'); nb.textContent = '🌿 拖动'; }
   }
   const on = diagram.classList.toggle('sorting');
   page.querySelectorAll('.card').forEach(c => { c.draggable = on; });
@@ -1703,7 +1702,7 @@ window.addEventListener('load', () => {
   if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
   if (window.self !== window.top){
     const tip = document.getElementById('env-tip');
-    if (tip){ tip.textContent = '⚠ 预览环境发音受限，点「下载本页」用本地浏览器打开即可正常发音'; tip.style.display = 'inline-block'; }
+    if (tip){ tip.textContent = '⚠ 预览环境发音受限，请用本地浏览器打开本文件即可正常发音'; tip.style.display = 'inline-block'; }
   }
   bindSearch();
   document.getElementById('menuBtn').addEventListener('click', () => {
