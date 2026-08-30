@@ -39,7 +39,7 @@ body{
 .rk-name{font-weight:600;color:#0C447C;flex:0 0 auto;}
 .rk-mean{font-size:11px;color:#999;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rk-cnt{margin-left:auto;font-size:10px;color:#B0AEA4;flex:0 0 auto;}
-.main{flex:1;overflow:auto;position:relative;}
+.main{flex:1;overflow:auto;position:relative;padding-top:70px;}
 .topbar{
   position:sticky;top:0;background:#FAFAF8;padding:12px 24px;z-index:10;
   border-bottom:1px solid #E9E7E0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
@@ -658,6 +658,7 @@ function renderLines(diagram, lines){
 function layoutPage(page){
   const centerNode = page.querySelector('.center-node');
   if (!centerNode) return;
+  centerNode.style.top = CENTER_TOP + 'px'; // 重置，避免上一次整体下移累加
   const centerBottom = CENTER_TOP + centerNode.offsetHeight;
   const startTop = centerBottom + ROW_GAP;
   const diagram = page.querySelector('.diagram');
@@ -755,6 +756,25 @@ function layoutPage(page){
   // 隐藏旧版 div 连线，统一用 SVG
   const spine = page.querySelector('.spine'); if (spine) spine.style.display = 'none';
   page.querySelectorAll('.crossbar').forEach(b => b.style.display = 'none');
+
+  // 安全下移：确保最顶部卡片不会贴/超出 diagram 顶部（留出 20px 呼吸空间）
+  let minTop = CENTER_TOP;
+  allCards.forEach(c => {
+    if (c.style.display === 'none') return;
+    const t = parseFloat(c.style.top || 0);
+    if (!isNaN(t) && t < minTop) minTop = t;
+  });
+  const SAFE_TOP = 20;
+  if (minTop < SAFE_TOP){
+    const delta = SAFE_TOP - minTop;
+    centerNode.style.top = (CENTER_TOP + delta) + 'px';
+    allCards.forEach(c => {
+      if (c.style.display === 'none' || c.style.top === '') return;
+      c.style.top = (parseFloat(c.style.top) + delta) + 'px';
+    });
+    lines.forEach(ln => { ln.y1 += delta; ln.y2 += delta; });
+    maxBottom += delta;
+  }
 
   renderLines(diagram, lines);
   diagram.style.height = (maxBottom + 20) + 'px';
