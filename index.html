@@ -39,7 +39,7 @@ body{
 .rk-name{font-weight:600;color:#0C447C;flex:0 0 auto;}
 .rk-mean{font-size:11px;color:#999;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rk-cnt{margin-left:auto;font-size:10px;color:#B0AEA4;flex:0 0 auto;}
-.main{flex:1;overflow-y:auto;position:relative;}
+.main{flex:1;overflow:auto;position:relative;}
 .topbar{
   position:sticky;top:0;background:#FAFAF8;padding:12px 24px;z-index:10;
   border-bottom:1px solid #E9E7E0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
@@ -67,7 +67,7 @@ body{
 .ph-mean{font-size:13px;color:#0F6E56;font-weight:600;margin-left:8px;}
 .ph-origin{font-size:11px;color:#999;font-weight:400;margin-left:6px;}
 .ph-stat{font-size:11px;color:#888;margin-top:5px;}
-.diagram{position:relative;width:680px;min-height:300px;margin:0 auto;}
+.diagram{position:relative;min-width:680px;width:max-content;min-height:300px;margin:0 auto;padding-right:24px;}
 .center-node{
   position:absolute;left:250px;top:40px;width:180px;border:1px solid #185FA5;
   border-radius:12px;overflow:hidden;z-index:2;cursor:pointer;background:#fff;
@@ -462,7 +462,7 @@ const ROW_GAP = 16;
 const CENTER_TOP = 40;
 const CARD_WIDTH = 280;
 const CHILD_WIDTH = 260;
-const INDENT = 36;
+const H_GAP = 36;     // 父子卡片水平间距
 const CENTER_X = 340; // 中心节点中轴线（250 + 180/2）
 const TRASH_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
 
@@ -689,17 +689,19 @@ function layoutPage(page){
     return 0;
   });
 
-  // 计算整个子树占用的垂直高度（仅统计当前展开的卡片）
+  // 计算整个子树占用的垂直高度（仅统计当前展开的卡片；子卡片在右侧，不参与父卡片下方堆叠）
   function treeHeight(word){
     const c = cardByWord[word];
     if (!c || c.style.display === 'none') return 0;
     let h = c.offsetHeight;
-    (children[word] || []).forEach(cw => { h += ROW_GAP + treeHeight(cw); });
-    return h;
+    let childH = 0;
+    (children[word] || []).forEach(cw => { childH += ROW_GAP + treeHeight(cw); });
+    return Math.max(h, childH ? childH - ROW_GAP : 0);
   }
 
   const lines = [];
-  // 递归布局一个节点及其子树，返回该子树最底部 y 坐标
+  // 递归布局一个节点及其子树，返回该子树占用的最底部 y 坐标
+  // 规则：子卡片放在父卡片右侧，多个子卡片在右侧垂直堆叠
   function layoutNode(word, left, top){
     const c = cardByWord[word];
     if (!c || c.style.display === 'none') return top;
@@ -707,17 +709,21 @@ function layoutPage(page){
     c.style.left = left + 'px';
     c.style.top = top + 'px';
     c.style.width = (c.classList.contains('child') ? CHILD_WIDTH : CARD_WIDTH) + 'px';
-    let childTop = top + c.offsetHeight + ROW_GAP;
-    const childLeft = left + INDENT;
+    const myW = c.offsetWidth;
+    const myH = c.offsetHeight;
+    const childLeft = left + myW + H_GAP;
+    let childTop = top;
+    let childrenBottom = top;
     (children[word] || []).forEach(cw => {
       const child = cardByWord[cw];
       if (child.style.display === 'none') return;
-      const yParent = top + c.offsetHeight / 2;
+      const yParent = top + myH / 2;
       const yChild = childTop + child.offsetHeight / 2;
-      lines.push({type:'branch', x1:left + c.offsetWidth, y1:yParent, x2:childLeft, y2:yChild});
-      childTop = layoutNode(cw, childLeft, childTop) + ROW_GAP;
+      lines.push({type:'branch', x1:left + myW, y1:yParent, x2:childLeft, y2:yChild});
+      childrenBottom = layoutNode(cw, childLeft, childTop);
+      childTop = childrenBottom + ROW_GAP;
     });
-    return childTop - ROW_GAP;
+    return Math.max(top + myH, childrenBottom);
   }
 
   let leftTop = startTop, rightTop = startTop, maxBottom = startTop;
@@ -745,6 +751,14 @@ function layoutPage(page){
 
   renderLines(diagram, lines);
   diagram.style.height = (maxBottom + 20) + 'px';
+  // 根据最右侧卡片自动扩展 diagram 宽度，便于子卡片向右展开时横向滚动查看
+  let maxRight = 680;
+  allCards.forEach(c => {
+    if (c.style.display === 'none') return;
+    const r = parseFloat(c.style.left || 0) + c.offsetWidth;
+    if (r > maxRight) maxRight = r;
+  });
+  diagram.style.minWidth = (maxRight + 24) + 'px';
 }
 function layout(){
   const p = document.querySelector('.page.active');
