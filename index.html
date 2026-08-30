@@ -1488,7 +1488,7 @@ function initAuth(){
     return; // 仍显示门禁；不提供本地模式绕过
   }
   if (!SB_ENABLED){ showGate(false); return; } // 本地模式（未配置 Supabase），不强制门禁
-  if (location.protocol === 'file:'){ showGate(false); authErr('本地文件模式：未启用云端登录'); return; }
+  if (location.protocol === 'file:'){ authErr('本地文件模式不支持登录，请改用线上地址访问'); return; }
   try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); }
   catch (e){ authErr('云端初始化失败，请刷新页面重试'); return; }
   sb.auth.getUser().then(({ data }) => {
