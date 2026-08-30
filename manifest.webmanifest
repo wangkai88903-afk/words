@@ -1,0 +1,16 @@
+{
+  "name": "词根词缀 · 中考→高考词汇思维导图",
+  "short_name": "词根词汇",
+  "description": "按词根梳理中考考纲词汇并拓展至高考水平，支持目录跳转、折叠、发音、自定义笔记与离线使用。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#042C53",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
