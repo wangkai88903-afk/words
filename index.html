@@ -242,6 +242,13 @@ select.tag-select option{background:#fff;color:#222;font-weight:500;}
 .set-btn.primary:hover{background:#0C447C;color:#fff;}
 .set-btn.danger{color:#B31412;border-color:#F0C4C1;}
 .set-btn.danger:hover{background:#FDECEA;color:#B31412;border-color:#E0A9A5;}
+.grp-row{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+.grp-row label{font-size:12px;color:#555;min-width:56px;}
+.grp-row input{flex:1;min-width:90px;padding:5px 8px;border:1px solid #CCC;border-radius:6px;font-size:12px;}
+#groupSelect{width:100%;padding:5px 8px;border:1px solid #CCC;border-radius:6px;font-size:12px;margin-top:2px;}
+.grp-pending{margin:8px 0;}
+.grp-pend-row{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:4px;}
+.grp-msg{font-size:11px;min-height:14px;margin-top:4px;}
 .tag-row{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid #EEE;
   border-radius:8px;margin-bottom:7px;background:#FCFCFB;}
 .tag-row input[type=color]{width:28px;height:28px;padding:0;border:1px solid #DDD;border-radius:6px;
@@ -544,6 +551,29 @@ select.tag-select option{background:#fff;color:#222;font-weight:500;}
       <div id="acctBox"></div>
     </div>
 
+    <div class="set-sec" id="groupSec">
+      <div class="set-sec-title">学习小组</div>
+      <div class="set-hint">创建或加入小组后，组内成员共享词根的全部收藏、笔记与自定义内容。无角色区分，人人平等。</div>
+      <div class="grp-row"><label>当前小组</label>
+        <select id="groupSelect"><option value="">（个人，不共享）</option></select>
+      </div>
+      <div class="grp-row">
+        <input id="grpName" placeholder="小组名称" maxlength="20">
+        <input id="grpPass" type="text" placeholder="小组口令" maxlength="20">
+        <button class="set-btn primary" id="grpCreate">创建小组</button>
+      </div>
+      <div class="grp-row">
+        <input id="jName" placeholder="要加入的小组名称" maxlength="20">
+        <input id="jPass" type="text" placeholder="小组口令" maxlength="20">
+        <button class="set-btn" id="grpJoin">申请加入</button>
+      </div>
+      <div id="grpPending" class="grp-pending"></div>
+      <div class="grp-row">
+        <button class="set-btn" id="grpImport">把我的个人内容导入当前小组</button>
+      </div>
+      <div id="grpMsg" class="grp-msg"></div>
+    </div>
+
     <div class="set-hint">图例：卡片标题<b>实心底</b>＝该标签使用实心配色；正文中<b style="color:#D93025">红色字</b>＝该义项属中考水平。</div>
 
     <div class="modal-actions">
@@ -601,7 +631,7 @@ function persistLocal(){ try { localStorage.setItem('ud_cache_v1', JSON.stringif
 let _sbSaveT = null;
 function persist(){
   persistLocal();
-  if (typeof sbSave === 'function') sbSave();
+  if (typeof syncSave === 'function') syncSave();
 }
 function migrateLegacy(){
   // 旧版 localStorage 数据迁移到 UD（保留既有用户数据）
@@ -629,6 +659,160 @@ function migrateLegacy(){
     });
   } catch (e){}
   persistLocal();
+}
+
+/* ================= 小组共享态（合并方案：group-priority / personal-fallback） ================= */
+let sbGroups = [];      // [{group_id, group_name}]
+let curGroup = null;    // 当前小组 id；null = 个人态
+let groupBase = null;   // 上次同步到的小组态（3-way merge 的 base）
+let groupVersion = 1;   // 当前小组态 version
+let _grpSaveT = null;
+
+function persistCurGroup(){ try { localStorage.setItem('cur_group', curGroup || ''); } catch(e){} }
+function loadCurGroup(){ try { const v = localStorage.getItem('cur_group'); curGroup = (v && v.length) ? v : null; } catch(e){ curGroup = null; } }
+
+async function loadGroups(){
+  sbGroups = [];
+  if (!sb || !sbUser) return;
+  const { data, error } = await sb.rpc('my_groups');
+  if (!error && data) sbGroups = data.map(g => ({ group_id: g.group_id, group_name: g.group_name }));
+  loadCurGroup();
+  if (curGroup && !sbGroups.some(g => g.group_id === curGroup)) curGroup = null;
+  if (!curGroup && sbGroups.length) curGroup = sbGroups[0].group_id;
+  persistCurGroup();
+  await syncLoad();
+  renderGroupSection();
+}
+
+async function syncLoad(){
+  if (curGroup){ await groupLoad(); } else { await sbLoad(); }
+}
+async function groupLoad(){
+  const { data } = await sb.from('roots_group_state').select('data,version').eq('group_id', curGroup).maybeSingle();
+  if (data && data.data && JSON.stringify(data.data) !== '{}'){
+    groupBase = sanitizeUD(data.data); groupVersion = data.version || 1;
+    Object.assign(UD, groupBase);
+  } else { groupBase = sanitizeUD({}); groupVersion = 1; }
+  persistLocal();
+}
+
+async function groupSave(){
+  if (!curGroup || !sb || !sbUser) return false;
+  // ⚠️ 关键：PostgREST 的 update 匹配 0 行时**不返回 error**（error=null、data=null）。
+  //    所以旧写法 `if(error) return false` 会把「版本被他人抢先 / 行根本不存在」误判为成功，
+  //    造成静默丢数据。必须 .select() 取回受影响行，按行数判断是否真的写入。
+  for (let attempt = 0; attempt < 3; attempt++){
+    const { data: cur } = await sb.from('roots_group_state')
+      .select('data,version').eq('group_id', curGroup).maybeSingle();
+    const baseVer = (cur && cur.version != null) ? cur.version : groupVersion;
+    const theirs  = (cur && cur.data) ? sanitizeUD(cur.data) : {};
+    const merged  = merge3(groupBase || {}, UD, theirs);
+    const stamp   = new Date().toISOString();
+    if (cur){
+      // 行存在 → 带 version 条件的 check-and-set
+      const { data: upd, error } = await sb.from('roots_group_state')
+        .update({ data: merged, version: (baseVer || 1) + 1, updated_by: sbUser.id, updated_at: stamp })
+        .eq('group_id', curGroup).eq('version', baseVer).select();
+      if (error) return false;
+      if (upd && upd.length){ groupBase = merged; groupVersion = (baseVer || 1) + 1; return true; }
+      // upd 为空 = version 已被他人推进 → 下一轮重读最新态、重新 merge 后再试
+    } else {
+      // 行不存在（旧组数据 / 建组时未预建）→ 直接 insert 建行
+      const { error } = await sb.from('roots_group_state')
+        .insert({ group_id: curGroup, data: merged, version: 1, updated_by: sbUser.id, updated_at: stamp });
+      if (!error){ groupBase = merged; groupVersion = 1; return true; }
+      // insert 冲突（他人同时建行）→ 下一轮走 CAS 分支
+    }
+    await new Promise(r => setTimeout(r, 150 + attempt * 250));
+  }
+  return false;
+}
+function groupSaveDebounced(){
+  clearTimeout(_grpSaveT);
+  _grpSaveT = setTimeout(async () => { if (!(await groupSave())) showToast('小组同步失败，请检查网络'); }, 600);
+}
+function syncSave(){ if (curGroup) groupSaveDebounced(); else sbSave(); }
+
+/* merge3：三路合并（UD 结构 fav/notes/custom/order/colors/parent/tags/cardTags/tagFilter/nav）
+   - fav 用当前状态并集（任一方标收藏即收藏）
+   - tags 按 id 去重合并
+   - dict 字段逐 key 三路合并：仅一侧变取该侧；两侧都变且不同→冲突以对方为准 */
+function _isObj(x){ return x && typeof x === 'object' && !Array.isArray(x); }
+function _eq(a,b){ if(a===b) return true; if(typeof a!==typeof b) return false; if(a===null||b===null) return a===b; try{ return JSON.stringify(a)===JSON.stringify(b);}catch(e){return false;} }
+function _mergeDict(base,mine,theirs){
+  const out={}; const keys=new Set([...Object.keys(base||{}),...Object.keys(mine||{}),...Object.keys(theirs||{})]);
+  for(const k of keys){
+    const b=base?base[k]:undefined, m=mine?mine[k]:undefined, t=theirs?theirs[k]:undefined;
+    const mc=!_eq(b,m), tc=!_eq(b,t);
+    if(mc&&tc) out[k]=_eq(m,t)?m:t; else if(mc) out[k]=m; else if(tc) out[k]=t;
+    else out[k]=(b!==undefined?b:(m!==undefined?m:t));
+  }
+  return out;
+}
+function _mergeTags(base,mine,theirs){
+  const m=new Map(); (base||[]).forEach(t=>m.set(t.id,t)); (theirs||[]).forEach(t=>m.set(t.id,t)); (mine||[]).forEach(t=>{if(!m.has(t.id))m.set(t.id,t);});
+  return Array.from(m.values());
+}
+function _mergeFav(mine,theirs){
+  const out={}; const keys=new Set([...Object.keys(mine||{}),...Object.keys(theirs||{})]);
+  for(const k of keys) out[k]=!!((mine&&mine[k])||(theirs&&theirs[k]));
+  return out;
+}
+const _DICT_KEYS=['notes','custom','order','colors','parent','cardTags','tagFilter','nav'];
+function merge3(base,mine,theirs){
+  base=base||{}; mine=mine||{}; theirs=theirs||{}; const out={};
+  out.fav=_mergeFav(mine.fav,theirs.fav);
+  out.tags=_mergeTags(base.tags,mine.tags,theirs.tags);
+  for(const k of _DICT_KEYS) out[k]=_mergeDict(base[k],mine[k],theirs[k]);
+  return out;
+}
+
+/* 小组管理 UI */
+function grpMsg(s,ok){ const e=document.getElementById('grpMsg'); if(e){ e.textContent=s||''; e.style.color= ok?'#2F9E44':'#D93025'; } }
+function renderGroupSection(){
+  const sel=document.getElementById('groupSelect'); if(!sel) return;
+  sel.innerHTML = '<option value="">（个人，不共享）</option>' +
+    sbGroups.map(g=>'<option value="'+g.group_id+'">'+esc(g.group_name)+'</option>').join('') +
+    (sbGroups.length?'':'<option disabled>（你还未加入任何小组）</option>');
+  sel.value = curGroup || '';
+  const pend=document.getElementById('grpPending');
+  if(pend){ if(curGroup){
+      sb.from('group_members').select('user_id,status').eq('group_id',curGroup).eq('status','pending').then(({data})=>{
+        if(!data||!data.length){ pend.innerHTML=''; return; }
+        pend.innerHTML = '<div class="set-sec-title">待审批成员</div>' + data.map(d=>
+          '<div class="grp-pend-row">'+esc((d.user_id||'').slice(0,8))+
+          '<button class="set-btn primary" data-uid="'+d.user_id+'">通过</button></div>').join('');
+        pend.querySelectorAll('button[data-uid]').forEach(b=>b.onclick=()=>{
+          sb.rpc('approve_member',{p_group:curGroup,p_user:b.dataset.uid}).then(({error})=>{
+            if(error) grpMsg('审批失败：'+error.message,false); else { grpMsg('已通过',true); renderGroupSection(); }
+          });
+        });
+      });
+    } else pend.innerHTML=''; }
+}
+function setupGroupsUI(){
+  const sel=document.getElementById('groupSelect'); if(sel) sel.onchange=()=>{
+    curGroup = sel.value || null; persistCurGroup(); syncLoad().then(()=>{ applyUserState(); renderGroupSection(); });
+  };
+  const c=document.getElementById('grpCreate'); if(c) c.onclick=async()=>{
+    const n=val('grpName'), p=val('grpPass'); if(!n||!p){ grpMsg('请填写小组名称和口令',false); return; }
+    const {data,error}=await sb.rpc('create_group',{p_name:n,p_passcode:p});
+    if(error) grpMsg('创建失败：'+error.message,false);
+    else { grpMsg('已创建并进入小组',true); await loadGroups(); applyUserState(); }
+  };
+  const j=document.getElementById('grpJoin'); if(j) j.onclick=async()=>{
+    const n=val('jName'), p=val('jPass'); if(!n||!p){ grpMsg('请填写小组名称和口令',false); return; }
+    const {data,error}=await sb.rpc('join_group',{p_name:n,p_passcode:p});
+    if(error) grpMsg('申请失败：'+error.message,false);
+    else if(data) grpMsg('申请已提交，等待创建者审批',true);
+    else grpMsg('小组名称或口令错误',false);
+  };
+  const im=document.getElementById('grpImport'); if(im) im.onclick=async()=>{
+    if(!curGroup){ grpMsg('请先选择或加入一个小组',false); return; }
+    if(!confirm('将把你的个人收藏/笔记/自定义内容合并进当前小组（小组内他人内容不会被删除）？')) return;
+    groupBase = sanitizeUD({}); groupVersion = 1;
+    await groupSave(); grpMsg('已导入当前小组',true);
+  };
 }
 
 /* ================= 标签系统（决定卡片配色与筛选） ================= */
@@ -2228,6 +2412,7 @@ window.addEventListener('load', () => {
   document.getElementById('scrim').addEventListener('click', closeSidebar);
 
   setupGate();
+  setupGroupsUI();
   applyUserState();   // 先按本地缓存渲染用户数据
   initAuth();         // 再视情况显示登录门禁 / 自动登录
 
